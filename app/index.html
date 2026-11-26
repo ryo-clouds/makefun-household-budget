@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>HearthLedger — Family Budget &amp; Cashflow Workbench</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a href="#/" class="brand" id="brand-link">
+        <svg class="brand-mark" viewBox="0 0 28 28" width="26" height="26" aria-hidden="true">
+          <rect x="2" y="2" width="24" height="24" rx="6" fill="#1B6B50"></rect>
+          <path d="M8 14.5L14 9l6 5.5V20a1 1 0 0 1-1 1h-3.5v-4.5h-3V21H9a1 1 0 0 1-1-1v-5.5z" fill="#F7F5F0"></path>
+          <circle cx="20.5" cy="8.5" r="2.5" fill="#C85A32"></circle>
+        </svg>
+        <span class="brand-text">
+          <strong>HearthLedger</strong>
+          <small>Nov 2026 · Offline</small>
+        </span>
+      </a>
+      <button type="button" class="nav-toggle" id="nav-toggle" aria-label="Toggle navigation" aria-expanded="false">☰</button>
+      <nav class="nav" id="main-nav" aria-label="Primary">
+        <a href="#/" data-route="/">Overview</a>
+        <a href="#/envelopes" data-route="/envelopes">Envelopes</a>
+        <a href="#/ledger" data-route="/ledger">Ledger &amp; Bills</a>
+        <a href="#/goals" data-route="/goals">Goals &amp; Debt</a>
+        <a href="#/guide" data-route="/guide">Guide</a>
+        <button type="button" class="btn-ghost btn-sm" id="reset-sample-btn" title="Restore sample household data">Reset Sample</button>
+      </nav>
+    </div>
+  </header>
+  <main id="app" class="container" tabindex="-1"></main>
+  <script type="module" src="main.js"></script>
+</body>
+</html>
