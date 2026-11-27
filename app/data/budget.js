@@ -80,6 +80,12 @@ export function createDefaultState() {
 }
 
 let memoryFallback = null;
+let idSeq = 0;
+
+export function nextId(prefix = 't') {
+  idSeq += 1;
+  return `${prefix}-${Date.now()}-${idSeq}`;
+}
 
 export function escHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, (ch) => (
@@ -126,6 +132,7 @@ function isValidState(parsed) {
     return false;
   }
   return (
+    CATEGORIES.every((c) => Number.isFinite(parsed.caps[c.id]) && parsed.caps[c.id] >= 0) &&
     parsed.incomes.every((i) => isPlainObject(i) && typeof i.id === 'string' && typeof i.name === 'string' && Number.isFinite(i.amount)) &&
     parsed.transactions.every((t) => isPlainObject(t) && typeof t.id === 'string' && typeof t.date === 'string' && typeof t.desc === 'string' && isValidCategory(t.category) && (t.type === 'income' || t.type === 'expense') && Number.isFinite(t.amount)) &&
     parsed.bills.every((b) => isPlainObject(b) && typeof b.id === 'string' && typeof b.name === 'string' && Number.isFinite(b.amount)) &&

@@ -1,6 +1,6 @@
 // Ledger & Recurring Bills page: searchable/filterable/sortable ledger, bill checklist, CSV/JSON export.
 import {
-  CATEGORIES, computeSummary, escHtml, fmtCurrency, isValidCategory, toMoney,
+  CATEGORIES, computeSummary, escHtml, fmtCurrency, isValidCategory, nextId, toMoney,
 } from '../data/budget.js';
 
 const ui = { search: '', category: 'all', type: 'all', sort: 'date-desc' };
@@ -192,7 +192,7 @@ export function renderLedger(root, ctx) {
       return;
     }
     const next = ctx.getState();
-    next.transactions.unshift({ id: `t-${Date.now()}`, date, desc, category, type, amount });
+    next.transactions.unshift({ id: nextId('t'), date, desc, category, type, amount });
     ctx.setState(next);
     renderLedger(root, ctx);
   });

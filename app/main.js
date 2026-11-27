@@ -1,7 +1,7 @@
 // HearthLedger shell router, Overview view, SVG charts, and quick cashflow entry.
 import {
   CATEGORIES, HISTORY_MONTHS, computeSummary, escHtml,
-  fmtCurrency, fmtPercent, isValidCategory, readState, resetState, saveState, toMoney,
+  fmtCurrency, fmtPercent, isValidCategory, nextId, readState, resetState, saveState, toMoney,
 } from './data/budget.js';
 
 const appEl = document.getElementById('app');
@@ -202,7 +202,7 @@ function handleQuickEntry(event) {
     return;
   }
   state.transactions.unshift({
-    id: `t-${Date.now()}`,
+    id: nextId('t'),
     date: '2026-11-26',
     desc,
     category,
@@ -213,12 +213,24 @@ function handleQuickEntry(event) {
   renderOverview();
 }
 
-const routeHandlers = {
-  '/': () => renderOverview(),
-  '/envelopes': async () => (await import('./pages/envelopes.js')).renderEnvelopes(appEl, ctx),
-  '/ledger': async () => (await import('./pages/ledger.js')).renderLedger(appEl, ctx),
-  '/goals': async () => (await import('./pages/goals.js')).renderGoals(appEl, ctx),
-  '/guide': async () => (await import('./pages/guide.js')).renderGuide(appEl, ctx),
+const routeLoaders = {
+  '/': async () => () => renderOverview(),
+  '/envelopes': async () => {
+    const { renderEnvelopes } = await import('./pages/envelopes.js');
+    return () => renderEnvelopes(appEl, ctx);
+  },
+  '/ledger': async () => {
+    const { renderLedger } = await import('./pages/ledger.js');
+    return () => renderLedger(appEl, ctx);
+  },
+  '/goals': async () => {
+    const { renderGoals } = await import('./pages/goals.js');
+    return () => renderGoals(appEl, ctx);
+  },
+  '/guide': async () => {
+    const { renderGuide } = await import('./pages/guide.js');
+    return () => renderGuide(appEl, ctx);
+  },
 };
 
 const ctx = {
@@ -230,11 +242,15 @@ const ctx = {
   rerender: () => routePage(),
 };
 
+let routeSeq = 0;
+
 async function routePage() {
+  const seq = ++routeSeq;
   state = readState();
-  const route = Object.hasOwn(routeHandlers, currentRoute()) ? currentRoute() : '/';
+  const route = Object.hasOwn(routeLoaders, currentRoute()) ? currentRoute() : '/';
   updateNav(route);
-  await routeHandlers[route]();
+  const render = await routeLoaders[route]();
+  if (seq === routeSeq) render();
 }
 
 toggleEl?.addEventListener('click', () => {

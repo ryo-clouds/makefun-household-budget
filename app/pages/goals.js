@@ -156,7 +156,7 @@ export function renderGoals(root, ctx) {
         <form id="custom-goal-form" style="margin-top:10px">
           <div class="form-row">
             <div class="field"><label for="cg-select">Custom Contribution</label><select id="cg-select">${state.goals.map((g) => `<option value="${escHtml(g.id)}">${escHtml(g.name)}</option>`).join('')}</select></div>
-            <div class="field"><label for="cg-amt">Amount ($)</label><input id="cg-amt" type="number" min="1" step="1" placeholder="150" required></div>
+            <div class="field"><label for="cg-amt">Amount ($)</label><input id="cg-amt" type="number" min="0.01" step="0.01" placeholder="150" required></div>
             <div><button type="submit" class="btn btn-primary" style="width:100%">Contribute</button></div>
           </div>
           <div class="err" id="cg-err" role="alert"></div>
