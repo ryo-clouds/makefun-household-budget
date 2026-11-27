@@ -39,6 +39,48 @@ function filterAndSort(transactions) {
   });
 }
 
+function buildTableRows(rows) {
+  return rows.length ? rows.map((t) => `
+    <tr>
+      <td class="num">${escHtml(t.date)}</td>
+      <td>${escHtml(t.desc)}</td>
+      <td><span class="badge ${t.type === 'income' ? 'badge-ok' : 'badge-terra'}">${escHtml(t.category)}</span></td>
+      <td>${t.type === 'income' ? 'Income' : 'Expense'}</td>
+      <td class="right" style="color:${t.type === 'income' ? 'var(--emerald)' : 'var(--ink)'}">
+        ${t.type === 'income' ? '+' : '-'}${fmtCurrency(t.amount, 2)}
+      </td>
+      <td class="right"><button type="button" class="btn-ghost btn-sm" data-del-tx="${escHtml(t.id)}" aria-label="Delete ${escHtml(t.desc)}">Remove</button></td>
+    </tr>
+  `).join('') : '<tr><td colspan="6" class="muted">No matching transactions. Clear filters or log a new entry.</td></tr>';
+}
+
+function bindDeleteButtons(root, ctx, scope = root) {
+  for (const btn of scope.querySelectorAll('[data-del-tx]')) {
+    btn.addEventListener('click', () => {
+      const id = btn.getAttribute('data-del-tx');
+      const next = ctx.getState();
+      next.transactions = next.transactions.filter((t) => t.id !== id);
+      ctx.setState(next);
+      renderLedger(root, ctx);
+    });
+  }
+}
+
+function updateFilteredView(root, ctx) {
+  const state = ctx.getState();
+  const sum = computeSummary(state);
+  const rows = filterAndSort(state.transactions);
+  const summaryEl = document.getElementById('ld-summary');
+  const tbodyEl = document.getElementById('ld-tbody');
+  if (summaryEl) {
+    summaryEl.textContent = `Showing ${rows.length} of ${state.transactions.length} entries · Net Income ${fmtCurrency(sum.totalIncome)} · Spent ${fmtCurrency(sum.totalSpent)}`;
+  }
+  if (tbodyEl) {
+    tbodyEl.innerHTML = buildTableRows(rows);
+    bindDeleteButtons(root, ctx, tbodyEl);
+  }
+}
+
 export function renderLedger(root, ctx) {
   const state = ctx.getState();
   const sum = computeSummary(state);
@@ -52,18 +94,7 @@ export function renderLedger(root, ctx) {
 
   const addCatOptions = CATEGORIES.map((c) => `<option value="${escHtml(c.id)}">${escHtml(c.id)}</option>`).join('');
 
-  const tableRows = rows.length ? rows.map((t) => `
-    <tr>
-      <td class="num">${escHtml(t.date)}</td>
-      <td>${escHtml(t.desc)}</td>
-      <td><span class="badge ${t.type === 'income' ? 'badge-ok' : 'badge-terra'}">${escHtml(t.category)}</span></td>
-      <td>${t.type === 'income' ? 'Income' : 'Expense'}</td>
-      <td class="right" style="color:${t.type === 'income' ? 'var(--emerald)' : 'var(--ink)'}">
-        ${t.type === 'income' ? '+' : '-'}${fmtCurrency(t.amount, 2)}
-      </td>
-      <td class="right"><button type="button" class="btn-ghost btn-sm" data-del-tx="${escHtml(t.id)}" aria-label="Delete ${escHtml(t.desc)}">Remove</button></td>
-    </tr>
-  `).join('') : '<tr><td colspan="6" class="muted">No matching transactions. Clear filters or log a new entry.</td></tr>';
+  const tableRows = buildTableRows(rows);
 
   const billRows = state.bills.map((b) => `
     <div class="pill-row">
@@ -82,7 +113,7 @@ export function renderLedger(root, ctx) {
     <div class="page-head">
       <div>
         <h1>Cashflow Ledger &amp; Recurring Bills</h1>
-        <p>Showing ${rows.length} of ${state.transactions.length} entries · Net Income ${fmtCurrency(sum.totalIncome)} · Spent ${fmtCurrency(sum.totalSpent)}</p>
+        <p id="ld-summary">Showing ${rows.length} of ${state.transactions.length} entries · Net Income ${fmtCurrency(sum.totalIncome)} · Spent ${fmtCurrency(sum.totalSpent)}</p>
       </div>
       <div class="btn-group">
         <button type="button" class="btn btn-sm" id="export-csv-btn">Download CSV</button>
@@ -142,7 +173,7 @@ export function renderLedger(root, ctx) {
       <div class="table-wrap">
         <table>
           <thead><tr><th>Date</th><th>Description</th><th>Category</th><th>Type</th><th class="right">Amount</th><th class="right">Action</th></tr></thead>
-          <tbody>${tableRows}</tbody>
+          <tbody id="ld-tbody">${tableRows}</tbody>
         </table>
       </div>
     </section>
@@ -167,26 +198,14 @@ export function renderLedger(root, ctx) {
   });
 
   document.getElementById('ld-search')?.addEventListener('input', (e) => {
-    const pos = e.target.selectionStart ?? e.target.value.length;
     ui.search = e.target.value;
-    renderLedger(root, ctx);
-    const inp = document.getElementById('ld-search');
-    inp?.focus();
-    inp?.setSelectionRange(pos, pos);
+    updateFilteredView(root, ctx);
   });
-  document.getElementById('ld-filter-cat')?.addEventListener('change', (e) => { ui.category = e.target.value; renderLedger(root, ctx); });
-  document.getElementById('ld-filter-type')?.addEventListener('change', (e) => { ui.type = e.target.value; renderLedger(root, ctx); });
-  document.getElementById('ld-sort')?.addEventListener('change', (e) => { ui.sort = e.target.value; renderLedger(root, ctx); });
+  document.getElementById('ld-filter-cat')?.addEventListener('change', (e) => { ui.category = e.target.value; updateFilteredView(root, ctx); });
+  document.getElementById('ld-filter-type')?.addEventListener('change', (e) => { ui.type = e.target.value; updateFilteredView(root, ctx); });
+  document.getElementById('ld-sort')?.addEventListener('change', (e) => { ui.sort = e.target.value; updateFilteredView(root, ctx); });
 
-  for (const btn of root.querySelectorAll('[data-del-tx]')) {
-    btn.addEventListener('click', () => {
-      const id = btn.getAttribute('data-del-tx');
-      const next = ctx.getState();
-      next.transactions = next.transactions.filter((t) => t.id !== id);
-      ctx.setState(next);
-      renderLedger(root, ctx);
-    });
-  }
+  bindDeleteButtons(root, ctx);
 
   for (const chk of root.querySelectorAll('[data-bill-id]')) {
     chk.addEventListener('change', () => {
