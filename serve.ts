@@ -54,6 +54,7 @@ createServer((req, res) => {
     'content-type': MIME[extname(file).toLowerCase()] ?? 'application/octet-stream',
     'content-length': size,
     'cache-control': 'no-store',
+    'x-content-type-options': 'nosniff',
   });
   createReadStream(file).pipe(res);
 }).listen(port, '127.0.0.1', () => {
