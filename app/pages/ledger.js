@@ -1,13 +1,14 @@
 // Ledger & Recurring Bills page: searchable/filterable/sortable ledger, bill checklist, CSV/JSON export.
 import {
-  CATEGORIES, computeSummary, escHtml, fmtCurrency, toMoney,
+  CATEGORIES, computeSummary, escHtml, fmtCurrency, isValidCategory, toMoney,
 } from '../data/budget.js';
 
 const ui = { search: '', category: 'all', type: 'all', sort: 'date-desc' };
 
-function csvCell(value) {
+function csvCell(value, isNumeric = false) {
   const s = String(value ?? '');
-  return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  const safe = !isNumeric && /^[=+\-@\t\r]/.test(s) ? `'${s}` : s;
+  return /[",\r\n]/.test(safe) || safe !== s ? `"${safe.replace(/"/g, '""')}"` : safe;
 }
 
 function triggerDownload(filename, mime, content) {
@@ -155,8 +156,8 @@ export function renderLedger(root, ctx) {
     const desc = document.getElementById('ld-desc').value.trim();
     const amount = toMoney(document.getElementById('ld-amt').value, false);
     const errEl = document.getElementById('ld-err');
-    if (!desc || !amount) {
-      errEl.textContent = 'Provide a description and a positive dollar amount.';
+    if (!desc || !amount || !isValidCategory(category)) {
+      errEl.textContent = 'Provide a valid category, description, and a positive dollar amount.';
       return;
     }
     const next = ctx.getState();
@@ -166,11 +167,12 @@ export function renderLedger(root, ctx) {
   });
 
   document.getElementById('ld-search')?.addEventListener('input', (e) => {
+    const pos = e.target.selectionStart ?? e.target.value.length;
     ui.search = e.target.value;
     renderLedger(root, ctx);
     const inp = document.getElementById('ld-search');
     inp?.focus();
-    inp?.setSelectionRange(ui.search.length, ui.search.length);
+    inp?.setSelectionRange(pos, pos);
   });
   document.getElementById('ld-filter-cat')?.addEventListener('change', (e) => { ui.category = e.target.value; renderLedger(root, ctx); });
   document.getElementById('ld-filter-type')?.addEventListener('change', (e) => { ui.type = e.target.value; renderLedger(root, ctx); });
@@ -199,9 +201,16 @@ export function renderLedger(root, ctx) {
 
   document.getElementById('export-csv-btn')?.addEventListener('click', () => {
     const header = ['Date', 'Description', 'Category', 'Type', 'Amount'];
-    const lines = [header.join(','), ...ctx.getState().transactions.map((t) => (
-      [t.date, t.desc, t.category, t.type, t.amount.toFixed(2)].map(csvCell).join(',')
-    ))];
+    const lines = [
+      header.join(','),
+      ...ctx.getState().transactions.map((t) => [
+        csvCell(t.date),
+        csvCell(t.desc),
+        csvCell(t.category),
+        csvCell(t.type),
+        csvCell((Number.isFinite(t.amount) ? t.amount : 0).toFixed(2), true),
+      ].join(',')),
+    ];
     triggerDownload('hearthledger-nov-2026.csv', 'text/csv;charset=utf-8', lines.join('\r\n'));
   });
 

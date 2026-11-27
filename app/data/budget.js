@@ -105,12 +105,44 @@ export function fmtPercent(ratio) {
   return `${(safe * 100).toFixed(1)}%`;
 }
 
+export function isValidCategory(category) {
+  return typeof category === 'string' && CATEGORIES.some((c) => c.id === category);
+}
+
+function isPlainObject(value) {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function isValidState(parsed) {
+  if (!isPlainObject(parsed)) return false;
+  if (
+    !Array.isArray(parsed.incomes) ||
+    !Array.isArray(parsed.transactions) ||
+    !Array.isArray(parsed.bills) ||
+    !Array.isArray(parsed.goals) ||
+    !Array.isArray(parsed.debts) ||
+    !isPlainObject(parsed.caps)
+  ) {
+    return false;
+  }
+  return (
+    parsed.incomes.every((i) => isPlainObject(i) && typeof i.id === 'string' && typeof i.name === 'string' && Number.isFinite(i.amount)) &&
+    parsed.transactions.every((t) => isPlainObject(t) && typeof t.id === 'string' && typeof t.date === 'string' && typeof t.desc === 'string' && isValidCategory(t.category) && (t.type === 'income' || t.type === 'expense') && Number.isFinite(t.amount)) &&
+    parsed.bills.every((b) => isPlainObject(b) && typeof b.id === 'string' && typeof b.name === 'string' && Number.isFinite(b.amount)) &&
+    parsed.goals.every((g) => isPlainObject(g) && typeof g.id === 'string' && typeof g.name === 'string' && Number.isFinite(g.target) && Number.isFinite(g.saved) && Number.isFinite(g.monthly)) &&
+    parsed.debts.every((d) => isPlainObject(d) && typeof d.id === 'string' && typeof d.name === 'string' && Number.isFinite(d.balance) && Number.isFinite(d.apr) && Number.isFinite(d.minPayment))
+  );
+}
+
 export function readState() {
   try {
     const raw = globalThis.localStorage?.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (parsed && Array.isArray(parsed.transactions) && parsed.caps) return parsed;
+      if (isValidState(parsed)) {
+        if (typeof parsed.monthLabel !== 'string') parsed.monthLabel = 'Nov 2026';
+        return parsed;
+      }
     }
   } catch {
     // Graceful fallback when localStorage is unavailable.

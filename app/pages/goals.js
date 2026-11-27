@@ -124,14 +124,14 @@ export function renderGoals(root, ctx) {
       <div class="card">
         <div class="card-head">
           <h2>Avalanche vs. Snowball Curve</h2>
-          <span class="badge badge-ok">Extra: ${fmtCurrency(extra)}/mo</span>
+          <span class="badge badge-ok" id="extra-debt-badge">Extra: ${fmtCurrency(extra)}/mo</span>
         </div>
         <div class="field" style="margin-bottom:10px">
-          <label for="extra-debt-range">Extra Monthly Payment Toward Debt: <strong class="num">${fmtCurrency(extra)}/mo</strong></label>
+          <label for="extra-debt-range">Extra Monthly Payment Toward Debt: <strong class="num" id="extra-debt-label-val">${fmtCurrency(extra)}/mo</strong></label>
           <input id="extra-debt-range" type="range" min="0" max="1500" step="50" value="${extra}">
         </div>
-        ${renderDebtCurveSvg(avalanche, snowball, minimumOnly, state.debtStrategy)}
-        <div class="legend">
+        <div id="debt-curve-wrap">${renderDebtCurveSvg(avalanche, snowball, minimumOnly, state.debtStrategy)}</div>
+        <div class="legend" id="debt-legend">
           <span><i class="dot" style="background:#1B6B50"></i>Avalanche (${avalanche.months} mo · ${fmtCurrency(avalanche.totalInterest)} interest)</span>
           <span><i class="dot" style="background:#C85A32"></i>Snowball (${snowball.months} mo · ${fmtCurrency(snowball.totalInterest)} interest)</span>
           <span><i class="dot" style="background:#8C96A3"></i>Minimums only (${minimumOnly.months} mo · ${fmtCurrency(minimumOnly.totalInterest)} interest)</span>
@@ -141,7 +141,7 @@ export function renderGoals(root, ctx) {
       <div class="card">
         <div class="card-head">
           <h2>Household Balances &amp; Savings</h2>
-          <span class="badge badge-terra">Saves ${fmtCurrency(minimumOnly.totalInterest - (state.debtStrategy === 'snowball' ? snowball.totalInterest : avalanche.totalInterest))} via ${state.debtStrategy === 'snowball' ? 'Snowball' : 'Avalanche'}</span>
+          <span class="badge badge-terra" id="debt-saves-badge">Saves ${fmtCurrency(minimumOnly.totalInterest - (state.debtStrategy === 'snowball' ? snowball.totalInterest : avalanche.totalInterest))} via ${state.debtStrategy === 'snowball' ? 'Snowball' : 'Avalanche'}</span>
         </div>
         <div class="table-wrap">
           <table>
@@ -151,7 +151,7 @@ export function renderGoals(root, ctx) {
         </div>
         <div class="pill-row" style="margin-top:8px">
           <span>Avalanche vs. Snowball Interest Difference</span>
-          <strong class="num" style="color:var(--emerald)">${fmtCurrency(snowball.totalInterest - avalanche.totalInterest)} saved</strong>
+          <strong class="num" id="debt-diff-val" style="color:var(--emerald)">${fmtCurrency(snowball.totalInterest - avalanche.totalInterest)} saved</strong>
         </div>
         <form id="custom-goal-form" style="margin-top:10px">
           <div class="form-row">
@@ -159,6 +159,7 @@ export function renderGoals(root, ctx) {
             <div class="field"><label for="cg-amt">Amount ($)</label><input id="cg-amt" type="number" min="1" step="1" placeholder="150" required></div>
             <div><button type="submit" class="btn btn-primary" style="width:100%">Contribute</button></div>
           </div>
+          <div class="err" id="cg-err" role="alert"></div>
         </form>
       </div>
     </section>
@@ -181,7 +182,11 @@ export function renderGoals(root, ctx) {
     e.preventDefault();
     const id = document.getElementById('cg-select').value;
     const amt = toMoney(document.getElementById('cg-amt').value, false);
-    if (!amt) return;
+    const errEl = document.getElementById('cg-err');
+    if (!amt) {
+      if (errEl) errEl.textContent = 'Enter a positive dollar amount.';
+      return;
+    }
     const next = ctx.getState();
     const goal = next.goals.find((g) => g.id === id);
     if (goal) goal.saved += amt;
@@ -195,8 +200,29 @@ export function renderGoals(root, ctx) {
     const next = ctx.getState();
     next.extraDebtPayment = val;
     ctx.setState(next);
-    renderGoals(root, ctx);
-    document.getElementById('extra-debt-range')?.focus();
+    const av = simulatePayoff(next.debts, val, 'avalanche');
+    const sn = simulatePayoff(next.debts, val, 'snowball');
+    const badgeEl = document.getElementById('extra-debt-badge');
+    const labelEl = document.getElementById('extra-debt-label-val');
+    const wrapEl = document.getElementById('debt-curve-wrap');
+    const legendEl = document.getElementById('debt-legend');
+    const savesEl = document.getElementById('debt-saves-badge');
+    const diffEl = document.getElementById('debt-diff-val');
+    if (badgeEl) badgeEl.textContent = `Extra: ${fmtCurrency(val)}/mo`;
+    if (labelEl) labelEl.textContent = `${fmtCurrency(val)}/mo`;
+    if (wrapEl) wrapEl.innerHTML = renderDebtCurveSvg(av, sn, minimumOnly, next.debtStrategy);
+    if (legendEl) {
+      legendEl.innerHTML = `
+        <span><i class="dot" style="background:#1B6B50"></i>Avalanche (${av.months} mo · ${fmtCurrency(av.totalInterest)} interest)</span>
+        <span><i class="dot" style="background:#C85A32"></i>Snowball (${sn.months} mo · ${fmtCurrency(sn.totalInterest)} interest)</span>
+        <span><i class="dot" style="background:#8C96A3"></i>Minimums only (${minimumOnly.months} mo · ${fmtCurrency(minimumOnly.totalInterest)} interest)</span>
+      `;
+    }
+    if (savesEl) {
+      const activeInterest = next.debtStrategy === 'snowball' ? sn.totalInterest : av.totalInterest;
+      savesEl.textContent = `Saves ${fmtCurrency(minimumOnly.totalInterest - activeInterest)} via ${next.debtStrategy === 'snowball' ? 'Snowball' : 'Avalanche'}`;
+    }
+    if (diffEl) diffEl.textContent = `${fmtCurrency(sn.totalInterest - av.totalInterest)} saved`;
   });
 
   for (const btn of root.querySelectorAll('[data-strat]')) {

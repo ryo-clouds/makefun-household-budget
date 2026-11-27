@@ -1,6 +1,6 @@
 // Envelopes & Scenarios page: editable category caps, 1-click presets, and income stream tuning.
 import {
-  CATEGORIES, computeSummary, escHtml, fmtCurrency, fmtPercent, toMoney,
+  CATEGORIES, computeSummary, escHtml, fmtCurrency, fmtPercent, isValidCategory, toMoney,
 } from '../data/budget.js';
 
 const PRESETS = {
@@ -46,10 +46,15 @@ const PRESETS = {
 };
 
 function statusOf(spent, cap) {
-  if (cap <= 0 || spent > cap) return { cls: 'badge-bad', bar: 'bar-bad', text: `Over by ${fmtCurrency(spent - cap)}` };
+  if (spent > cap) return { cls: 'badge-bad', bar: 'bar-bad', text: `Over by ${fmtCurrency(spent - cap)}` };
+  if (cap <= 0) return { cls: 'badge-ok', bar: '', text: '0% used · Healthy' };
   const ratio = spent / cap;
   if (ratio >= 0.85) return { cls: 'badge-warn', bar: 'bar-warn', text: `${Math.round(ratio * 100)}% used · Watch` };
   return { cls: 'badge-ok', bar: '', text: `${Math.round(ratio * 100)}% used · Healthy` };
+}
+
+function capInputId(id) {
+  return `cap-${id.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
 }
 
 export function renderEnvelopes(root, ctx) {
@@ -66,8 +71,9 @@ export function renderEnvelopes(root, ctx) {
     const spent = sum.spentByCategory[cat.id] ?? 0;
     const cap = state.caps[cat.id] ?? 0;
     const st = statusOf(spent, cap);
-    const pct = cap > 0 ? Math.min(100, Math.round((spent / cap) * 100)) : 100;
+    const pct = cap > 0 ? Math.min(100, Math.round((spent / cap) * 100)) : (spent > 0 ? 100 : 0);
     const rem = cap - spent;
+    const inputId = capInputId(cat.id);
     return `
       <div class="card">
         <div class="card-head">
@@ -84,8 +90,8 @@ export function renderEnvelopes(root, ctx) {
             ${rem >= 0 ? `<span style="color:var(--emerald)">${fmtCurrency(rem)} left</span>` : `<span style="color:var(--crimson)">${fmtCurrency(Math.abs(rem))} over</span>`}
           </div>
           <div style="display:flex;align-items:center;gap:6px">
-            <label class="muted" for="cap-${escHtml(cat.id)}">Cap $</label>
-            <input id="cap-${escHtml(cat.id)}" data-cap-cat="${escHtml(cat.id)}" type="number" min="0" step="10" value="${cap}" style="width:96px">
+            <label class="muted" for="${inputId}">Cap $</label>
+            <input id="${inputId}" data-cap-cat="${escHtml(cat.id)}" type="number" min="0" step="10" value="${cap}" style="width:96px">
           </div>
         </div>
       </div>
@@ -141,7 +147,7 @@ export function renderEnvelopes(root, ctx) {
   for (const btn of root.querySelectorAll('[data-preset]')) {
     btn.addEventListener('click', () => {
       const key = btn.getAttribute('data-preset');
-      const preset = PRESETS[key];
+      const preset = key && Object.hasOwn(PRESETS, key) ? PRESETS[key] : null;
       if (!preset) return;
       const next = ctx.getState();
       next.activePreset = key;
@@ -154,6 +160,7 @@ export function renderEnvelopes(root, ctx) {
   for (const input of root.querySelectorAll('[data-cap-cat]')) {
     input.addEventListener('change', () => {
       const cat = input.getAttribute('data-cap-cat');
+      if (!isValidCategory(cat)) return;
       const val = toMoney(input.value, true);
       if (val === null) {
         input.value = String(ctx.getState().caps[cat] ?? 0);

@@ -1,7 +1,7 @@
 // HearthLedger shell router, Overview view, SVG charts, and quick cashflow entry.
 import {
   CATEGORIES, HISTORY_MONTHS, computeSummary, escHtml,
-  fmtCurrency, fmtPercent, readState, resetState, saveState, toMoney,
+  fmtCurrency, fmtPercent, isValidCategory, readState, resetState, saveState, toMoney,
 } from './data/budget.js';
 
 const appEl = document.getElementById('app');
@@ -25,11 +25,12 @@ function updateNav(route) {
 }
 
 function renderAllocationSvg(summary) {
-  const inc = Math.max(summary.totalIncome, 1);
+  const hasIncome = summary.totalIncome > 0;
+  const inc = hasIncome ? summary.totalIncome : 1;
   const rows = [
-    { label: 'Needs', actual: summary.needsSpent / inc, target: 0.50, color: '#1B6B50', amt: summary.needsSpent },
-    { label: 'Wants', actual: summary.wantsSpent / inc, target: 0.30, color: '#C85A32', amt: summary.wantsSpent },
-    { label: 'Savings & Surplus', actual: summary.totalSavings / inc, target: 0.20, color: '#2B5B84', amt: summary.totalSavings },
+    { label: 'Needs', actual: hasIncome ? summary.needsSpent / inc : 0, target: 0.50, color: '#1B6B50', amt: summary.needsSpent },
+    { label: 'Wants', actual: hasIncome ? summary.wantsSpent / inc : 0, target: 0.30, color: '#C85A32', amt: summary.wantsSpent },
+    { label: 'Savings & Surplus', actual: hasIncome ? summary.totalSavings / inc : 0, target: 0.20, color: '#2B5B84', amt: summary.totalSavings },
   ];
   const bars = rows.map((r, i) => {
     const y = 14 + i * 52;
@@ -69,9 +70,9 @@ function renderOverview() {
   const catOptions = CATEGORIES.map((c) => `<option value="${escHtml(c.id)}">${escHtml(c.id)}</option>`).join('');
   const topEnvelopes = CATEGORIES.slice(0, 5).map((cat) => {
     const spent = sum.spentByCategory[cat.id] ?? 0;
-    const cap = state.caps[cat.id] ?? 1;
-    const pct = cap > 0 ? Math.min(100, Math.round((spent / cap) * 100)) : 100;
-    const cls = spent > cap ? 'bar-bad' : spent >= cap * 0.85 ? 'bar-warn' : '';
+    const cap = state.caps[cat.id] ?? 0;
+    const pct = cap > 0 ? Math.min(100, Math.round((spent / cap) * 100)) : (spent > 0 ? 100 : 0);
+    const cls = spent > cap ? 'bar-bad' : cap > 0 && spent >= cap * 0.85 ? 'bar-warn' : '';
     return `<div style="margin-bottom:8px">
       <div style="display:flex;justify-content:space-between;font-size:12.5px">
         <span><strong>${escHtml(cat.id)}</strong></span>
@@ -81,7 +82,10 @@ function renderOverview() {
     </div>`;
   }).join('');
 
-  const recentRows = state.transactions.slice(0, 5).map((t) => `<tr>
+  const recentRows = [...state.transactions]
+    .sort((a, b) => b.date.localeCompare(a.date))
+    .slice(0, 5)
+    .map((t) => `<tr>
     <td>${escHtml(t.date.slice(5))}</td>
     <td>${escHtml(t.desc)}</td>
     <td><span class="badge ${t.type === 'income' ? 'badge-ok' : 'badge-terra'}">${escHtml(t.category)}</span></td>
@@ -193,8 +197,8 @@ function handleQuickEntry(event) {
   const amount = toMoney(document.getElementById('qe-amt').value, false);
   const desc = document.getElementById('qe-desc').value.trim();
   const errEl = document.getElementById('qe-err');
-  if (!amount || !desc) {
-    errEl.textContent = 'Enter a valid description and positive dollar amount.';
+  if (!amount || !desc || !isValidCategory(category)) {
+    errEl.textContent = 'Enter a valid category, description, and positive dollar amount.';
     return;
   }
   state.transactions.unshift({
